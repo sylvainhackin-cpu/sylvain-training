@@ -300,6 +300,7 @@ canvas{width:100%;height:180px;background:var(--surface2);border:1px solid var(-
 <section id="body" hidden>
   <div class="card">
     <div class="row"><div><h2>Carte du corps</h2><div class="hint">Touchez directement la zone gênante. Vue avant et arrière.</div></div><span class="pill">0–10</span></div>
+    <div class="gate" style="margin:12px 0"><div class="lbl">Sensation du jour</div><div id="bodyTodayDate" style="font-size:20px;font-weight:800"></div><div class="hint" id="bodyTodayStatus">Choisis une zone du corps pour saisir tes sensations du jour.</div></div>
     <div class="body-map-wrap">
       <div class="body-map-card">
         <div class="body-map-title">DEVANT</div>
@@ -428,7 +429,7 @@ window.addEventListener('error',function(e){
 (()=>{'use strict';
 const RACE='2026-11-22';
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 const fmt=(n,d=0)=>n==null||!isFinite(n)?'–':Number(n).toLocaleString('fr-BE',{minimumFractionDigits:d,maximumFractionDigits:d});
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const med=a=>{const b=a.filter(Number.isFinite).slice().sort((x,y)=>x-y);if(!b.length)return null;const m=Math.floor(b.length/2);return b.length%2?b[m]:(b[m-1]+b[m])/2}
@@ -1544,6 +1545,10 @@ function renderBodyMap(id,side){
  box.querySelectorAll('.body-zone').forEach(b=>b.onclick=()=>{painSel=b.dataset.z;renderPain();renderPainEditor()});
 }
 function renderPain(){
+ const d=today();
+ const dateBox=$('#bodyTodayDate'), statusBox=$('#bodyTodayStatus');
+ if(dateBox)dateBox.textContent=frDate(d);
+ if(statusBox){const n=new Set(S.pain.filter(p=>p.date===d).map(p=>p.zone)).size;statusBox.textContent=n?n+' zone'+(n>1?'s':'')+' renseignée'+(n>1?'s':'')+' aujourd’hui · touche une zone pour la mettre à jour.':'Choisis une zone du corps pour saisir tes sensations d’aujourd’hui.';}
  renderBodyMap('#bodyFront','front');
  renderBodyMap('#bodyBack','back');
  renderPainHistory();
@@ -1553,16 +1558,24 @@ function renderPainEditor(){
  const box=$('#painEditor');
  if(!painSel){box.innerHTML='<div class="muted">Choisis une zone sur le corps.</div>';return}
  const last=painLatest(painSel);
+ const day=today();
+ const entry=S.pain.find(p=>p.zone===painSel&&p.date===day);
  box.innerHTML='<div class="row"><div><h2>'+painSel+'</h2><div class="hint">'+(last?'Dernière saisie : '+last.score+'/10 · '+frDate(last.date):'Aucune saisie précédente')+'</div></div><span class="pill">'+(last?last.score+'/10':'nouveau')+'</span></div>'+
- '<div class="grid" style="margin-top:10px"><label><span class="lbl">Intensité 0–10</span><input id="p-score" type="number" min="0" max="10" value="'+(last?last.score:'')+'"></label>'+
+ '<div class="hint" style="margin-top:8px;font-weight:700">Saisie pour le '+frDate(day)+(entry?' · modification de la saisie du jour':' · nouvelle saisie')+'</div>'+ 
+ '<div class="grid" style="margin-top:10px"><label><span class="lbl">Intensité 0–10</span><input id="p-score" type="number" min="0" max="10" value="'+(entry?entry.score:'')+'"></label>'+
  '<label><span class="lbl">Type</span><select id="p-type"><option>Raideur</option><option>Courbature</option><option>Tendon</option><option>Articulation</option><option>Douleur aiguë</option><option>Autre</option></select></label>'+
  '<label class="full"><span class="lbl">Note</span><input id="p-note" type="text" placeholder="Quand ? À la course ? À la marche ?"></label></div>'+
  '<div class="row" style="margin-top:12px"><span class="hint">0 = aucune gêne aujourd’hui.</span><button class="btn" id="p-save">Enregistrer</button></div>';
- if(last&&$('#p-type'))$('#p-type').value=last.type||'Raideur';
+ if(entry){$('#p-type').value=entry.type||'Raideur';$('#p-note').value=entry.note||'';}
  $('#p-save').onclick=()=>{
-   const score=Math.max(0,Math.min(10,+$('#p-score').value||0));
-   S.pain.unshift({id:Date.now().toString(36),date:today(),zone:painSel,score,type:$('#p-type').value,note:$('#p-note').value.trim()});
-   save();renderPain();renderPainEditor();toast('Zone enregistrée');
+   const value=$('#p-score').value;
+   if(value===''){toast('Indique une intensité de 0 à 10');return;}
+   const score=Math.max(0,Math.min(10,Number(value)||0));
+   const date=today();
+   const index=S.pain.findIndex(p=>p.zone===painSel&&p.date===date);
+   const record={id:index>=0?S.pain[index].id:Date.now().toString(36),date,zone:painSel,score,type:$('#p-type').value,note:$('#p-note').value.trim()};
+   if(index>=0)S.pain[index]=record;else S.pain.unshift(record);
+   save();renderPain();renderPainEditor();toast('Sensation du '+frDate(date)+' enregistrée');
  };
 }
 function renderPainTrends(){
