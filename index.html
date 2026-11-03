@@ -225,7 +225,7 @@ canvas{width:100%;height:180px;background:var(--surface2);border:1px solid var(-
   <div class="card">
     <div class="row"><div><h2>Planificateur pré-séance</h2><div class="hint">Calcule ce qu’il faut préparer à partir de tes propres cibles.</div></div><span class="pill">avant départ</span></div>
     <div class="grid" style="margin-top:10px">
-      <label><span class="lbl">Durée prévue (h:min)</span><input id="np-duration" type="text" inputmode="numeric" placeholder="4:00"></label>
+      <div><span class="lbl">Durée prévue</span><div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:4px"><label style="flex:1;min-width:0"><input id="np-hours" type="number" inputmode="numeric" min="0" step="1" value="4" aria-label="Heures"><span class="hint">Heures</span></label><span style="font-weight:800;font-size:22px;align-self:flex-start;padding-top:8px">:</span><label style="flex:1;min-width:0"><input id="np-minutes" type="number" inputmode="numeric" min="0" max="59" step="1" value="0" aria-label="Minutes"><span class="hint">Minutes (0–59)</span></label></div></div>
       <label><span class="lbl">Glucides cible (g/h)</span><input id="np-carb" type="number" min="0" step="5" value="70"></label>
       <label><span class="lbl">Liquide cible (ml/h)</span><input id="np-fluid" type="number" min="0" step="50" value="500"></label>
       <label><span class="lbl">Sodium cible (mg/L)</span><input id="np-sod" type="number" min="0" step="50" value="1500"></label>
@@ -1325,12 +1325,15 @@ function parsePlanDuration(v){
 }
 function renderNutritionPlanner(){
   const box=$('#np-result');if(!box)return;
-  const h=parsePlanDuration($('#np-duration').value);
+  const hv=$('#np-hours').value.trim(),mv=$('#np-minutes').value.trim();
+  const hours=Number(hv),minutes=Number(mv);
+  const validDuration=hv!==''&&mv!==''&&Number.isInteger(hours)&&Number.isInteger(minutes)&&hours>=0&&minutes>=0&&minutes<60;
+  const h=validDuration?hours+minutes/60:null;
   const carb=+$('#np-carb').value||0;
   const fluid=+$('#np-fluid').value||0;
   const sodConc=+$('#np-sod').value||0; // mg/L
   const flaskMl=+$('#np-flask').value||500;
-  if(!h){box.innerHTML='<div class="muted">Entre une durée prévue pour calculer le plan.</div>';return}
+  if(!h){box.innerHTML='<div class="muted">Indique une durée supérieure à zéro, avec des minutes entre 0 et 59.</div>';return}
 
   const needCarb=carb*h;
   const needFluid=fluid*h;
@@ -1401,7 +1404,7 @@ function renderNutritionPlanner(){
     '</div>'+
     '<p class="hint" style="margin-top:8px">La combinaison choisie utilise uniquement des pastilles entières PH 1500, PH 1000 et PH 500 et cherche à approcher au mieux ta concentration cible.</p>';
 }
-['np-duration','np-carb','np-fluid','np-sod','np-flask'].forEach(id=>{
+['np-hours','np-minutes','np-carb','np-fluid','np-sod','np-flask'].forEach(id=>{
   const el=$('#'+id);if(el)el.oninput=renderNutritionPlanner;
 });
 renderNutritionPlanner();
