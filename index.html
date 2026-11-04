@@ -1331,6 +1331,42 @@ function preRaceSettings(){
  if(!Array.isArray(cfg.targets)||cfg.targets.length!==3)cfg.targets=PRE_RACE_DEFAULTS.map(x=>({...x}));
  return cfg;
 }
+const PRE_RACE_MEALS=[
+ {label:'Petit-déjeuner',time:'7h30',foods:[['Pain blanc',0.55,0.50,'g'],['Confiture',0.20,0.60,'g'],['Jus de fruits',0.25,0.10,'ml']]},
+ {label:'Collation du matin',time:'10h30',foods:[['Compote',0.35,0.15,'g'],['Pain blanc',0.30,0.50,'g'],['Jus de fruits',0.35,0.10,'ml']]},
+ {label:'Déjeuner',time:'13h00',foods:[['Riz blanc cuit',0.65,0.28,'g'],['Pain blanc',0.20,0.50,'g'],['Jus de fruits',0.15,0.10,'ml']]},
+ {label:'Collation de 16h',time:'16h00',foods:[['Pain blanc',0.40,0.50,'g'],['Confiture',0.20,0.60,'g'],['Boisson glucidique',0.40,0.08,'ml']]},
+ {label:'Dîner léger',time:'19h00',foods:[['Riz blanc cuit',0.70,0.28,'g'],['Pain blanc',0.20,0.50,'g'],['Compote',0.10,0.15,'g']]}
+];
+const PRE_RACE_SHARES={
+ 3:[25,10,30,15,20],
+ 2:[25,12,30,18,15],
+ 1:[28,12,30,20,10]
+};
+function preRaceMealExamples(meal,carbGoal){
+ return meal.foods.map(([name,share,density,unit])=>{
+   const portion=carbGoal*share/density;
+   const rounded=Math.round(portion/5)*5;
+   return name+' : ≈'+fmt(rounded)+' '+unit;
+ }).join(' · ');
+}
+function preRaceMealPlan(day,carbs,protein,fat){
+ const shares=PRE_RACE_SHARES[day]||PRE_RACE_SHARES[3];
+ const before=shares.slice(0,4).reduce((a,b)=>a+b,0);
+ return '<details style="margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:10px"'+(day===1?' open':'')+'>'+
+ '<summary style="cursor:pointer;font-weight:750">Répartition par repas · exemples d’aliments</summary>'+
+ (day===1?'<p class="hint" style="margin:8px 0"><b>'+before+' % des glucides avant la fin de la collation de 16h</b>, dîner volontairement léger. Répartition pratique, non obligation scientifique.</p>':'')+
+ PRE_RACE_MEALS.map((meal,i)=>{
+   const c=carbs*shares[i]/100,pr=protein*shares[i]/100,fa=fat*shares[i]/100;
+   return '<div style="border-top:1px solid var(--line);padding:9px 0">'+
+   '<div class="row"><b>'+meal.label+'</b><span class="hint">'+meal.time+' · '+shares[i]+' %</span></div>'+
+   '<div class="hint" style="margin-top:4px"><b>'+fmt(c,0)+' g glucides</b> · '+fmt(pr,0)+' g protéines · '+fmt(fa,0)+' g lipides</div>'+
+   '<div class="hint" style="margin-top:5px">Exemple glucidique : '+preRaceMealExamples(meal,c)+'</div>'+
+   '</div>';
+ }).join('')+
+ '<p class="hint" style="margin:7px 0 0">Portions indicatives arrondies, valeurs glucidiques moyennes (produits variables). Ces exemples ne couvrent que les glucides : complète les protéines et lipides avec des aliments familiers et faciles à digérer. Les masses du riz sont cuites, celles du pain et de la confiture sont prêtes à manger. Ajuste selon ton appétit et ta tolérance.</p>'+
+ '</details>';
+}
 function renderPreRace(){
  const cfg=preRaceSettings(),root=$('#pr-days');if(!root)return;
  $('#pr-date').value=cfg.raceDate;
@@ -1353,7 +1389,7 @@ function renderPreRace(){
        '<div class="metric"><b>'+fmt(carb,0)+' g</b><span>glucides</span></div>'+
        '<div class="metric"><b>'+fmt(prot,0)+' g</b><span>protéines</span></div>'+
        '<div class="metric"><b>'+fmt(fat,0)+' g</b><span>lipides</span></div>'+
-       '</div><div class="hint" style="margin-top:7px">Énergie indicative : '+fmt(kcal,0)+' kcal (4/4/9 kcal par gramme).</div>':
+       '</div><div class="hint" style="margin-top:7px">Énergie indicative : '+fmt(kcal,0)+' kcal (4/4/9 kcal par gramme).</div>'+preRaceMealPlan(t.day,carb,prot,fat):
        '<div class="hint" style="margin-top:9px">Vérifie le poids, la date et les cibles (0–20 g/kg).</div>')+
      '</div>';
  }).join('');
