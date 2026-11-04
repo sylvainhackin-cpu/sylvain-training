@@ -223,6 +223,17 @@ canvas{width:100%;height:180px;background:var(--surface2);border:1px solid var(-
 
 <section id="nutrition" hidden>
   <div class="card">
+    <div class="row"><div><h2>Nutrition avant-course · J−3 à J−1</h2><div class="hint">Planifier les apports quotidiens avant un trail long ou un ultra.</div></div><span class="pill">recharge</span></div>
+    <div class="grid" style="margin-top:12px">
+      <label><span class="lbl">Date de la course</span><input id="pr-date" type="date"></label>
+      <label><span class="lbl">Poids de référence (kg)</span><input id="pr-weight" type="number" inputmode="decimal" min="25" max="250" step="0.1"></label>
+    </div>
+    <div class="hint" style="margin:12px 0 8px">Modifie les cibles en g/kg/jour. Les grammes et l'énergie se recalculent automatiquement.</div>
+    <div id="pr-days"></div>
+    <p class="hint" style="margin-top:10px">Pour un effort de plus de 90 minutes, la recharge en glucides se concentre surtout sur les 36–48 dernières heures (souvent 8–12 g/kg/jour). Les protéines et lipides sont des repères ajustables, non des seuils imposés. Privilégie les aliments habituels et adapte les fibres à ta tolérance digestive.</p>
+    <button class="btn ghost small" id="pr-reset" style="margin-top:8px">Réinitialiser les cibles</button>
+  </div>
+  <div class="card">
     <div class="row"><div><h2>Planificateur pré-séance</h2><div class="hint">Calcule ce qu’il faut préparer à partir de tes propres cibles.</div></div><span class="pill">avant départ</span></div>
     <div class="grid" style="margin-top:10px">
       <div><span class="lbl">Durée prévue</span><div class="row" style="gap:8px;flex-wrap:nowrap;margin-top:4px"><label style="flex:1;min-width:0"><input id="np-hours" type="number" inputmode="numeric" min="0" step="1" value="4" aria-label="Heures"><span class="hint">Heures</span></label><span style="font-weight:800;font-size:22px;align-self:flex-start;padding-top:8px">:</span><label style="flex:1;min-width:0"><input id="np-minutes" type="number" inputmode="numeric" min="0" max="59" step="1" value="0" aria-label="Minutes"><span class="hint">Minutes (0–59)</span></label></div></div>
@@ -1305,6 +1316,69 @@ function renderCompare(){
  ((a.power&&a.hr&&b.power&&b.hr)?'<p class="hint">Efficacité W/bpm : '+fmt(a.power/a.hr,2)+' → '+fmt(b.power/b.hr,2)+' ('+fmt(((b.power/b.hr)/(a.power/a.hr)-1)*100,1)+'%).</p>':'');
 }
 renderAnalysis();
+
+
+const PRE_RACE_DEFAULTS=[
+ {day:3,carb:7,protein:1.6,fat:0.9},
+ {day:2,carb:9,protein:1.6,fat:0.8},
+ {day:1,carb:10,protein:1.6,fat:0.7}
+];
+function preRaceSettings(){
+ if(!S.preRaceNutrition||typeof S.preRaceNutrition!=='object')S.preRaceNutrition={};
+ const cfg=S.preRaceNutrition;
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(cfg.raceDate||''))cfg.raceDate=RACE;
+ if(!(Number(cfg.weight)>0))cfg.weight=Number(S.settings.weightRef)||65.2;
+ if(!Array.isArray(cfg.targets)||cfg.targets.length!==3)cfg.targets=PRE_RACE_DEFAULTS.map(x=>({...x}));
+ return cfg;
+}
+function renderPreRace(){
+ const cfg=preRaceSettings(),root=$('#pr-days');if(!root)return;
+ $('#pr-date').value=cfg.raceDate;
+ $('#pr-weight').value=cfg.weight;
+ const weight=Number(cfg.weight);
+ const valid=Number.isFinite(weight)&&weight>=25&&weight<=250&&/^\d{4}-\d{2}-\d{2}$/.test(cfg.raceDate);
+ root.innerHTML=cfg.targets.map((t,i)=>{
+   const date=valid?frDate(dateAdd(cfg.raceDate,-t.day)):'Date à corriger';
+   const cs=Number(t.carb),ps=Number(t.protein),fs=Number(t.fat);
+   const good=valid&&[cs,ps,fs].every(x=>Number.isFinite(x)&&x>=0&&x<=20);
+   const carb=good?weight*cs:0,prot=good?weight*ps:0,fat=good?weight*fs:0;
+   const kcal=carb*4+prot*4+fat*9;
+   return '<div style="padding:12px 0;border-top:1px solid var(--line)">'+
+     '<div class="row"><b>J−'+t.day+' · '+date+'</b><span class="pill">'+(t.day===3?'préparation':'recharge glucidique')+'</span></div>'+
+     '<div class="grid3" style="margin-top:10px">'+
+       [['Glucides',t.carb,'carb'],['Protéines',t.protein,'protein'],['Lipides',t.fat,'fat']].map(x=>
+        '<label><span class="lbl">'+x[0]+' g/kg</span><input type="number" inputmode="decimal" min="0" max="20" step="0.1" data-pr-index="'+i+'" data-pr-key="'+x[2]+'" value="'+x[1]+'"></label>').join('')+
+     '</div>'+
+     (good?'<div class="grid3" style="margin-top:10px">'+
+       '<div class="metric"><b>'+fmt(carb,0)+' g</b><span>glucides</span></div>'+
+       '<div class="metric"><b>'+fmt(prot,0)+' g</b><span>protéines</span></div>'+
+       '<div class="metric"><b>'+fmt(fat,0)+' g</b><span>lipides</span></div>'+
+       '</div><div class="hint" style="margin-top:7px">Énergie indicative : '+fmt(kcal,0)+' kcal (4/4/9 kcal par gramme).</div>':
+       '<div class="hint" style="margin-top:9px">Vérifie le poids, la date et les cibles (0–20 g/kg).</div>')+
+     '</div>';
+ }).join('');
+ root.querySelectorAll('[data-pr-index]').forEach(el=>el.onchange=()=>{
+   const val=Number(el.value);
+   if(el.value.trim()===''||!Number.isFinite(val)||val<0||val>20){toast('Cible entre 0 et 20 g/kg');renderPreRace();return;}
+   cfg.targets[Number(el.dataset.prIndex)][el.dataset.prKey]=val;
+   save();renderPreRace();
+ });
+}
+$('#pr-date').onchange=()=>{
+ const val=$('#pr-date').value;
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(val))return;
+ preRaceSettings().raceDate=val;save();renderPreRace();
+};
+$('#pr-weight').onchange=()=>{
+ const el=$('#pr-weight'),v=Number(el.value);
+ if(el.value.trim()===''||!Number.isFinite(v)||v<25||v>250){toast('Poids invalide');renderPreRace();return;}
+ preRaceSettings().weight=v;save();renderPreRace();
+};
+$('#pr-reset').onclick=()=>{
+ preRaceSettings().targets=PRE_RACE_DEFAULTS.map(x=>({...x}));
+ save();renderPreRace();toast('Cibles réinitialisées');
+};
+renderPreRace();
 
 const NUTRI_PRODUCTS={
  gel30:{name:'Gel — 30 g glucides',carb:30,fluid:0,sod:0},
